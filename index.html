@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AR Multiplayer Soccer</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      overflow: hidden;
+    }
+    #app {
+      width: 100vw;
+      height: 100vh;
+    }
+    .setup-screen, .lobby-screen {
+      min-height: 100vh;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      padding: 20px;
+      overflow-y: auto;
+    }
+    .container {
+      max-width: 500px;
+      margin: 0 auto;
+    }
+    .header {
+      text-align: center;
+      color: white;
+      margin-bottom: 40px;
+      margin-top: 40px;
+    }
+    .header h1 {
+      font-size: 42px;
+      margin: 0 0 10px 0;
+      font-weight: 800;
+      text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+    }
+    .header p {
+      opacity: 0.9;
+      font-size: 16px;
+    }
+    .card {
+      background: white;
+      border-radius: 20px;
+      padding: 30px;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+    }
+    .error {
+      background: #fee;
+      color: #c33;
+      padding: 15px;
+      border-radius: 12px;
+      margin-bottom: 20px;
+      border: 2px solid #fcc;
+    }
+    input {
+      width: 100%;
+      padding: 15px;
+      font-size: 16px;
+      border: 2px solid #e0e0e0;
+      border-radius: 12px;
+      margin-bottom: 15px;
+    }
+    button {
+      width: 100%;
+      padding: 18px;
+      border: none;
+      border-radius: 12px;
+      font-size: 18px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+    }
+    .btn-primary {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      margin-bottom: 15px;
+    }
+    .btn-success {
+      background: #10b981;
+      color: white;
+    }
+    .btn-start {
+      background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+      color: white;
+    }
+    .btn-secondary {
+      background: transparent;
+      color: #999;
+      font-size: 14px;
+      padding: 12px;
+      margin-top: 10px;
+    }
+    .divider {
+      text-align: center;
+      margin: 20px 0;
+      color: #999;
+      font-size: 14px;
+    }
+    .room-code {
+      text-align: center;
+      margin-bottom: 30px;
+    }
+    .room-code-label {
+      font-size: 14px;
+      color: #999;
+      margin-bottom: 10px;
+    }
+    .room-code-value {
+      font-size: 36px;
+      font-weight: 800;
+      letter-spacing: 8px;
+      color: #667eea;
+      font-family: monospace;
+    }
+    .players-section {
+      background: #f8f9fa;
+      padding: 20px;
+      border-radius: 12px;
+      margin-bottom: 25px;
+    }
+    .players-header {
+      font-size: 14px;
+      color: #666;
+      margin-bottom: 15px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .player-card {
+      padding: 12px;
+      background: white;
+      border-radius: 8px;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .player-avatar {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-weight: 600;
+    }
+    .player-name {
+      flex: 1;
+      font-weight: 500;
+    }
+    .host-badge {
+      background: #fef3c7;
+      color: #92400e;
+      padding: 4px 10px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .note {
+      text-align: center;
+      color: white;
+      margin-top: 30px;
+      font-size: 12px;
+      opacity: 0.7;
+    }
+    .ar-screen {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+    }
+    #arCanvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+    .ar-overlay {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      right: 20px;
+      background: rgba(0,0,0,0.7);
+      padding: 15px;
+      border-radius: 12px;
+      color: white;
+    }
+    .ar-info {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .ar-room {
+      font-size: 14px;
+      opacity: 0.8;
+    }
+    .ar-players {
+      font-size: 12px;
+      margin-top: 5px;
+    }
+    .btn-exit {
+      background: #ef4444;
+      padding: 8px 16px;
+      border-radius: 8px;
+      color: white;
+      cursor: pointer;
+      border: none;
+      font-size: 14px;
+    }
+    .ar-instructions {
+      position: absolute;
+      bottom: 40px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0,0,0,0.7);
+      padding: 12px 24px;
+      border-radius: 24px;
+      color: white;
+      font-size: 14px;
+    }
+    .hidden {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <!-- Setup Screen -->
+    <div id="setupScreen" class="setup-screen">
+      <div class="container">
+        <div class="header">
+          <h1>⚽ AR Soccer</h1>
+          <p>Kick virtual soccer balls in AR with friends</p>
+        </div>
+        
+        <div id="errorBox" class="error hidden"></div>
+        
+        <div class="card">
+          <input type="text" id="playerName" placeholder="Enter your name">
+          
+          <button class="btn-primary" onclick="hostGame()">
+            <span>📡</span> Host Game
+          </button>
+          
+          <div class="divider">OR</div>
+          
+          <input type="text" id="roomCodeInput" placeholder="Enter room code" style="text-align: center; letter-spacing: 2px; font-weight: 600;">
+          
+          <button class="btn-success" onclick="joinGame()">
+            <span>👥</span> Join Game
+          </button>
+        </div>
+        
+        <div class="note">
+          Note: This demo uses simulated networking. For real multiplayer on same WiFi, you'll need a WebSocket server.
+        </div>
+      </div>
+    </div>
+
+    <!-- Lobby Screen -->
+    <div id="lobbyScreen" class="setup-screen hidden">
+      <div class="container">
+        <div class="header">
+          <h1>⚽ AR Soccer</h1>
+          <p>Waiting for players...</p>
+        </div>
+        
+        <div class="card">
+          <div class="room-code">
+            <div class="room-code-label">Room Code</div>
+            <div class="room-code-value" id="roomCodeDisplay"></div>
+          </div>
+          
+          <div class="players-section">
+            <div class="players-header">
+              <span>👥</span> <span id="playerCount">Players (1)</span>
+            </div>
+            <div id="playersList"></div>
+          </div>
+          
+          <button class="btn-start" onclick="startAR()" id="startButton">
+            <span>▶️</span> Start AR Session
+          </button>
+          
+          <button class="btn-secondary" onclick="backToSetup()">Back</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- AR Screen -->
+    <div id="arScreen" class="ar-screen hidden">
+      <canvas id="arCanvas"></canvas>
+      
+      <div class="ar-overlay">
+        <div class="ar-info">
+          <div>
+            <div class="ar-room">Room: <span id="arRoomCode"></span></div>
+            <div class="ar-players" id="arPlayersList"></div>
+          </div>
+          <button class="btn-exit" onclick="exitAR()">Exit AR</button>
+        </div>
+      </div>
+      
+      <div class="ar-instructions">
+        Tap to place ball • Tap again to kick
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    let gameState = {
+      screen: 'setup',
+      playerName: '',
+      roomCode: '',
+      players: [],
+      isHost: false,
+      scene: null
+    };
+
+    function showError(msg) {
+      const errorBox = document.getElementById('errorBox');
+      errorBox.textContent = msg;
+      errorBox.classList.remove('hidden');
+      setTimeout(() => errorBox.classList.add('hidden'), 3000);
+    }
+
+    function generateRoomCode() {
+      return Math.random().toString(36).substring(2, 8).toUpperCase();
+    }
+
+    window.hostGame = function() {
+      const name = document.getElementById('playerName').value.trim();
+      if (!name) {
+        showError('Please enter your name');
+        return;
+      }
+      
+      gameState.playerName = name;
+      gameState.roomCode = generateRoomCode();
+      gameState.isHost = true;
+      gameState.players = [{ name, id: 'host' }];
+      
+      showLobby();
+    };
+
+    window.joinGame = function() {
+      const name = document.getElementById('playerName').value.trim();
+      const code = document.getElementById('roomCodeInput').value.trim();
+      
+      if (!name || !code) {
+        showError('Please enter your name and room code');
+        return;
+      }
+      
+      gameState.playerName = name;
+      gameState.roomCode = code;
+      gameState.isHost = false;
+      gameState.players = [{ name, id: 'guest' }];
+      
+      showLobby();
+    };
+
+    function showLobby() {
+      document.getElementById('setupScreen').classList.add('hidden');
+      document.getElementById('lobbyScreen').classList.remove('hidden');
+      
+      document.getElementById('roomCodeDisplay').textContent = gameState.roomCode;
+      updatePlayersList();
+    }
+
+    function updatePlayersList() {
+      const list = document.getElementById('playersList');
+      list.innerHTML = '';
+      
+      gameState.players.forEach(player => {
+        const div = document.createElement('div');
+        div.className = 'player-card';
+        div.innerHTML = `
+          <div class="player-avatar">${player.name[0].toUpperCase()}</div>
+          <div class="player-name">${player.name}</div>
+          ${player.id === 'host' ? '<div class="host-badge">HOST</div>' : ''}
+        `;
+        list.appendChild(div);
+      });
+      
+      document.getElementById('playerCount').textContent = `Players (${gameState.players.length})`;
+    }
+
+    window.backToSetup = function() {
+      document.getElementById('lobbyScreen').classList.add('hidden');
+      document.getElementById('setupScreen').classList.remove('hidden');
+    };
+
+    window.startAR = async function() {
+      if (!navigator.xr) {
+        showError('WebXR not supported on this device');
+        return;
+      }
+
+      try {
+        const supported = await navigator.xr.isSessionSupported('immersive-ar');
+        if (!supported) {
+          showError('AR not supported on this device. Try on Android Chrome with ARCore.');
+          return;
+        }
+
+        document.getElementById('lobbyScreen').classList.add('hidden');
+        document.getElementById('arScreen').classList.remove('hidden');
+        
+        document.getElementById('arRoomCode').textContent = gameState.roomCode;
+        document.getElementById('arPlayersList').textContent = '👥 ' + gameState.players.map(p => p.name).join(', ');
+        
+        await initAR();
+      } catch (err) {
+        showError('Failed to start AR: ' + err.message);
+        console.error(err);
+      }
+    };
+
+    window.exitAR = function() {
+      if (gameState.scene?.xrSession) {
+        gameState.scene.xrSession.end();
+      }
+      document.getElementById('arScreen').classList.add('hidden');
+      document.getElementById('lobbyScreen').classList.remove('hidden');
+    };
+
+    async function initAR() {
+      const THREE = await import('https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js');
+      
+      const canvas = document.getElementById('arCanvas');
+      const scene = new THREE.Scene();
+      const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+      
+      const renderer = new THREE.WebGLRenderer({ 
+        canvas, 
+        alpha: true,
+        antialias: true 
+      });
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.xr.enabled = true;
+
+      // Lighting
+      const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+      scene.add(ambientLight);
+
+      const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+      directionalLight.position.set(5, 10, 5);
+      directionalLight.castShadow = true;
+      scene.add(directionalLight);
+
+      // Soccer ball
+      const ballGeometry = new THREE.SphereGeometry(0.11, 32, 32);
+      
+      const canvas2d = document.createElement('canvas');
+      canvas2d.width = 512;
+      canvas2d.height = 512;
+      const ctx = canvas2d.getContext('2d');
+      
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, 512, 512);
+      
+      ctx.fillStyle = '#000000';
+      for (let i = 0; i < 12; i++) {
+        const angle = (i / 12) * Math.PI * 2;
+        const x = 256 + Math.cos(angle) * 150;
+        const y = 256 + Math.sin(angle) * 150;
+        ctx.beginPath();
+        for (let j = 0; j < 5; j++) {
+          const a = angle + (j / 5) * Math.PI * 2;
+          const px = x + Math.cos(a) * 30;
+          const py = y + Math.sin(a) * 30;
+          if (j === 0) ctx.moveTo(px, py);
+          else ctx.lineTo(px, py);
+        }
+        ctx.closePath();
+        ctx.fill();
+      }
+      
+      const texture = new THREE.CanvasTexture(canvas2d);
+      const ballMaterial = new THREE.MeshStandardMaterial({ 
+        map: texture,
+        roughness: 0.7,
+        metalness: 0.1
+      });
+      
+      const ball = new THREE.Mesh(ballGeometry, ballMaterial);
+      ball.castShadow = true;
+      ball.position.set(0, 0.5, -1);
+      scene.add(ball);
+
+      const ballState = {
+        velocity: new THREE.Vector3(0, 0, 0),
+        gravity: -9.8,
+        damping: 0.98,
+        groundLevel: 0
+      };
+
+      // Reticle
+      const reticleGeometry = new THREE.RingGeometry(0.08, 0.1, 32);
+      const reticleMaterial = new THREE.MeshBasicMaterial({ color: 0x00ff00, side: THREE.DoubleSide });
+      const reticle = new THREE.Mesh(reticleGeometry, reticleMaterial);
+      reticle.rotation.x = -Math.PI / 2;
+      reticle.visible = false;
+      scene.add(reticle);
+
+      // Start XR session
+      const session = await navigator.xr.requestSession('immersive-ar', {
+        requiredFeatures: ['hit-test', 'local-floor'],
+        optionalFeatures: ['dom-overlay'],
+        domOverlay: { root: document.body }
+      });
+
+      gameState.scene = { xrSession: session };
+
+      session.addEventListener('end', () => {
+        hitTestSource = null;
+        document.getElementById('arScreen').classList.add('hidden');
+        document.getElementById('lobbyScreen').classList.remove('hidden');
+      });
+
+      renderer.xr.setReferenceSpaceType('local-floor');
+      await renderer.xr.setSession(session);
+
+      let hitTestSource = null;
+      let ballPlaced = false;
+
+      session.requestReferenceSpace('viewer').then((refSpace) => {
+        session.requestHitTestSource({ space: refSpace }).then((source) => {
+          hitTestSource = source;
+        });
+      });
+
+      const controller = renderer.xr.getController(0);
+      controller.addEventListener('select', () => {
+        if (!ballPlaced && reticle.visible) {
+          ball.position.copy(reticle.position);
+          ball.position.y += 0.11;
+          ballPlaced = true;
+          reticle.visible = false;
+        } else if (ballPlaced) {
+          const direction = new THREE.Vector3();
+          camera.getWorldDirection(direction);
+          direction.y = 0.3;
+          direction.normalize();
+          ballState.velocity.copy(direction.multiplyScalar(5));
+        }
+      });
+      scene.add(controller);
+
+      renderer.setAnimationLoop((time, frame) => {
+        if (frame) {
+          if (hitTestSource && !ballPlaced) {
+            const hitTestResults = frame.getHitTestResults(hitTestSource);
+            if (hitTestResults.length > 0) {
+              const hit = hitTestResults[0];
+              const pose = hit.getPose(renderer.xr.getReferenceSpace());
+              reticle.visible = true;
+              reticle.position.set(pose.transform.position.x, pose.transform.position.y, pose.transform.position.z);
+              ballState.groundLevel = pose.transform.position.y;
+            }
+          }
+
+          if (ballPlaced) {
+            const deltaTime = 0.016;
+            
+            ballState.velocity.y += ballState.gravity * deltaTime;
+            
+            ball.position.x += ballState.velocity.x * deltaTime;
+            ball.position.y += ballState.velocity.y * deltaTime;
+            ball.position.z += ballState.velocity.z * deltaTime;
+            
+            if (ball.position.y - 0.11 <= ballState.groundLevel) {
+              ball.position.y = ballState.groundLevel + 0.11;
+              ballState.velocity.y = Math.abs(ballState.velocity.y) * 0.7;
+              ballState.velocity.x *= 0.95;
+              ballState.velocity.z *= 0.95;
+            }
+            
+            ballState.velocity.multiplyScalar(ballState.damping);
+            
+            const speed = Math.sqrt(ballState.velocity.x ** 2 + ballState.velocity.z ** 2);
+            ball.rotation.x += speed * deltaTime * 5;
+            ball.rotation.z += speed * deltaTime * 3;
+          }
+        }
+
+        renderer.render(scene, camera);
+      });
+    }
+  </script>
+</body>
+</html>
