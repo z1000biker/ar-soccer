@@ -130,171 +130,192 @@
             border-radius: 20px;
             z-index: 100;
             display: none;
+        }
 
-            <br><p>OR</p><input type="text" id="roomInput" placeholder="Room Code"><button class="btn-join" onclick="joinGame()">👥 Join Game</button></div><div id="lobby" style="display:none"><h1>⚽ AR Soccer</h1><p>Room Code:</p><div id="roomCode"></div><p id="players"></p><button class="btn-start" onclick="startAR()">▶️ Start AR</button><br><button class="btn-back" onclick="backToSetup()">Back</button></div></div><div id="arOverlay"><div class="ar-info"><div><div>Room: <span id="arRoom"></span></div><div id="arPlayers"></div></div><button class="btn-exit" onclick="exitAR()">Exit</button></div></div><div id="instructions">Tap to place ball • Tap again to kick</div><script>let state= {
-                playerName: '',
-                    roomCode: '',
-                    players: [],
-                    scene: null,
-                    camera: null,
-                    renderer: null,
-                    ball: null,
-                    reticle: null,
-                    hitTestSource: null,
-                    ballPlaced: false,
-                    ballVelocity: new THREE.Vector3(0, 0, 0),
-                    groundLevel: 0
+        #instructions.visible {
+            display: block;
+        }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+</head>
+
+<body>
+    <div id="overlay">
+        <div id="setup">
+            <h1>⚽ AR Soccer</h1>
+            <input type="text" id="playerName" placeholder="Your Name" value="Player">
+            <br>
+            <button class="btn-host" onclick="hostGame()">📡 Host Game</button>
+            <br>
+            <p>OR</p>
+            <input type="text" id="roomInput" placeholder="Room Code">
+            <button class="btn-join" onclick="joinGame()">👥 Join Game</button>
+        </div>
+        <div id="lobby" style="display:none">
+            <h1>⚽ AR Soccer</h1>
+            <p>Room Code:</p>
+            <div id="roomCode"></div>
+            <p id="players"></p>
+            <button class="btn-start" onclick="startAR()">▶️ Start AR</button>
+            <br>
+            <button class="btn-back" onclick="backToSetup()">Back</button>
+        </div>
+    </div>
+
+    <div id="arOverlay">
+        <div class="ar-info">
+            <div>
+                <div>Room: <span id="arRoom"></span></div>
+                <div id="arPlayers"></div>
+            </div>
+            <button class="btn-exit" onclick="exitAR()">Exit</button>
+        </div>
+    </div>
+
+    <div id="instructions">Tap to place ball • Tap again to kick</div>
+
+    <script>
+        let state = {
+            playerName: '',
+            roomCode: '',
+            players: [],
+            scene: null,
+            camera: null,
+            renderer: null,
+            ball: null,
+            reticle: null,
+            hitTestSource: null,
+            ballPlaced: false,
+            ballVelocity: new THREE.Vector3(0, 0, 0),
+            groundLevel: 0
+        };
+
+        function hostGame() {
+            state.playerName = document.getElementById('playerName').value || 'Player';
+            state.roomCode = Math.random().toString(36).substr(2, 6).toUpperCase();
+            state.players = [state.playerName];
+            showLobby();
+        }
+
+        function joinGame() {
+            state.playerName = document.getElementById('playerName').value || 'Player';
+            state.roomCode = document.getElementById('roomInput').value.toUpperCase();
+            if (!state.roomCode) {
+                alert('Enter room code');
+                return;
+            }
+            state.players = [state.playerName];
+            showLobby();
+        }
+
+        function showLobby() {
+            document.getElementById('setup').style.display = 'none';
+            document.getElementById('lobby').style.display = 'block';
+            document.getElementById('roomCode').textContent = state.roomCode;
+            document.getElementById('players').textContent = 'Players: ' + state.players.join(', ');
+        }
+
+        function backToSetup() {
+            document.getElementById('lobby').style.display = 'none';
+            document.getElementById('setup').style.display = 'block';
+        }
+
+        async function startAR() {
+            if (!navigator.xr) {
+                alert('WebXR not supported. Use Chrome on Android.');
+                return;
             }
 
-            ;
-
-            function hostGame() {
-                state.playerName=document.getElementById('playerName').value || 'Player';
-                state.roomCode=Math.random().toString(36).substr(2, 6).toUpperCase();
-                state.players=[state.playerName];
-                showLobby();
-            }
-
-            function joinGame() {
-                state.playerName=document.getElementById('playerName').value || 'Player';
-                state.roomCode=document.getElementById('roomInput').value.toUpperCase();
-
-                if ( !state.roomCode) {
-                    alert('Enter room code');
+            try {
+                const supported = await navigator.xr.isSessionSupported('immersive-ar');
+                if (!supported) {
+                    alert('AR not supported. Make sure ARCore is installed.');
                     return;
                 }
 
-                state.players=[state.playerName];
-                showLobby();
-            }
+                state.scene = new THREE.Scene();
+                state.camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 20);
 
-            function showLobby() {
-                document.getElementById('setup').style.display='none';
-                document.getElementById('lobby').style.display='block';
-                document.getElementById('roomCode').textContent=state.roomCode;
-                document.getElementById('players').textContent='Players: '+state.players.join(', ');
-            }
-
-            function backToSetup() {
-                document.getElementById('lobby').style.display='none';
-                document.getElementById('setup').style.display='block';
-            }
-
-            async function startAR() {
-                if ( !navigator.xr) {
-                    alert('WebXR not supported. Use Chrome on Android.');
-                    return;
-                }
-
-                try {
-                    const supported=await navigator.xr.isSessionSupported('immersive-ar');
-
-                    if ( !supported) {
-                        alert('AR not supported. Make sure ARCore is installed.');
-                        return;
-                    }
-
-                    state.scene=new THREE.Scene();
-                    state.camera=new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 20);
-
-                    state.renderer=new THREE.WebGLRenderer({
-                        antialias: true, alpha: true
-                    });
+                state.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
                 state.renderer.setPixelRatio(window.devicePixelRatio);
                 state.renderer.setSize(window.innerWidth, window.innerHeight);
-                state.renderer.xr.enabled=true;
+                state.renderer.xr.enabled = true;
                 document.body.appendChild(state.renderer.domElement);
 
-                const light=new THREE.HemisphereLight(0xffffff, 0xbbbbff, 1);
+                const light = new THREE.HemisphereLight(0xffffff, 0xbbbbff, 1);
                 light.position.set(0.5, 1, 0.25);
                 state.scene.add(light);
 
-                const ballGeometry=new THREE.SphereGeometry(0.11, 32, 32);
-
-                const ballMaterial=new THREE.MeshStandardMaterial({
+                const ballGeometry = new THREE.SphereGeometry(0.11, 32, 32);
+                const ballMaterial = new THREE.MeshStandardMaterial({
                     color: 0xffffff,
                     roughness: 0.7,
                     metalness: 0.1
                 });
-            state.ball=new THREE.Mesh(ballGeometry, ballMaterial);
-            state.ball.visible=false;
-            state.scene.add(state.ball);
+                state.ball = new THREE.Mesh(ballGeometry, ballMaterial);
+                state.ball.visible = false;
+                state.scene.add(state.ball);
 
-            const reticleGeometry=new THREE.RingGeometry(0.08, 0.1, 32).rotateX(-Math.PI / 2);
+                const reticleGeometry = new THREE.RingGeometry(0.08, 0.1, 32).rotateX(-Math.PI / 2);
+                const reticleMaterial = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
+                state.reticle = new THREE.Mesh(reticleGeometry, reticleMaterial);
+                state.reticle.matrixAutoUpdate = false;
+                state.reticle.visible = false;
+                state.scene.add(state.reticle);
 
-            const reticleMaterial=new THREE.MeshBasicMaterial({
-                color: 0x00ff00
-            });
-        state.reticle=new THREE.Mesh(reticleGeometry, reticleMaterial);
-        state.reticle.matrixAutoUpdate=false;
-        state.reticle.visible=false;
-        state.scene.add(state.reticle);
+                const session = await navigator.xr.requestSession('immersive-ar', {
+                    requiredFeatures: ['hit-test'],
+                    optionalFeatures: ['local-floor']
+                });
 
-        const session=await navigator.xr.requestSession('immersive-ar', {
-            requiredFeatures: ['hit-test'],
-            optionalFeatures: ['local-floor']
-        });
+                let referenceSpace;
+                try {
+                    referenceSpace = await session.requestReferenceSpace('local-floor');
+                } catch (e) {
+                    try {
+                        referenceSpace = await session.requestReferenceSpace('local');
+                    } catch (e) {
+                        referenceSpace = await session.requestReferenceSpace('viewer');
+                    }
+                }
 
-        let referenceSpace;
+                await state.renderer.xr.setSession(session);
 
-        try {
-            referenceSpace=await session.requestReferenceSpace('local-floor');
-        }
+                session.addEventListener('end', onSessionEnd);
 
-        catch (e) {
-            try {
-                referenceSpace=await session.requestReferenceSpace('local');
+                document.getElementById('overlay').classList.add('hidden');
+                document.getElementById('arOverlay').classList.add('visible');
+                document.getElementById('instructions').classList.add('visible');
+                document.getElementById('arRoom').textContent = state.roomCode;
+                document.getElementById('arPlayers').textContent = 'Players: ' + state.players.join(', ');
+
+                const viewerSpace = await session.requestReferenceSpace('viewer');
+                state.hitTestSource = await session.requestHitTestSource({ space: viewerSpace });
+
+                const controller = state.renderer.xr.getController(0);
+                controller.addEventListener('select', onSelect);
+                state.scene.add(controller);
+
+                state.renderer.setAnimationLoop(render);
+
+            } catch (e) {
+                alert('AR Error: ' + e.message);
+                console.error(e);
             }
-
-            catch (e) {
-                referenceSpace=await session.requestReferenceSpace('viewer');
-            }
-        }
-
-        await state.renderer.xr.setSession(session);
-
-        session.addEventListener('end', onSessionEnd);
-
-        document.getElementById('overlay').classList.add('hidden');
-        document.getElementById('arOverlay').classList.add('visible');
-        document.getElementById('instructions').classList.add('visible');
-        document.getElementById('arRoom').textContent=state.roomCode;
-        document.getElementById('arPlayers').textContent='Players: '+state.players.join(', ');
-
-        const viewerSpace=await session.requestReferenceSpace('viewer');
-
-        state.hitTestSource=await session.requestHitTestSource({
-            space: viewerSpace
-        });
-
-        const controller=state.renderer.xr.getController(0);
-        controller.addEventListener('select', onSelect);
-        state.scene.add(controller);
-
-        state.renderer.setAnimationLoop(render);
-
-        }
-
-        catch (e) {
-            alert('AR Error: ' + e.message);
-            console.error(e);
-        }
         }
 
         function onSelect() {
-            if ( !state.ballPlaced && state.reticle.visible) {
+            if (!state.ballPlaced && state.reticle.visible) {
                 state.ball.position.setFromMatrixPosition(state.reticle.matrix);
-                state.ball.position.y+=0.11;
-                state.ball.visible=true;
-                state.ballPlaced=true;
-                state.groundLevel=state.ball.position.y - 0.11;
-                state.reticle.visible=false;
-            }
-
-            else if (state.ballPlaced) {
-                const direction=new THREE.Vector3(0, 0, -1);
+                state.ball.position.y += 0.11;
+                state.ball.visible = true;
+                state.ballPlaced = true;
+                state.groundLevel = state.ball.position.y - 0.11;
+                state.reticle.visible = false;
+            } else if (state.ballPlaced) {
+                const direction = new THREE.Vector3(0, 0, -1);
                 direction.applyQuaternion(state.camera.quaternion);
-                direction.y=0.3;
+                direction.y = 0.3;
                 direction.normalize();
                 state.ballVelocity.copy(direction.multiplyScalar(15));
             }
@@ -302,43 +323,40 @@
 
         function render(timestamp, frame) {
             if (frame) {
-                const referenceSpace=state.renderer.xr.getReferenceSpace();
+                const referenceSpace = state.renderer.xr.getReferenceSpace();
 
                 if (state.hitTestSource && !state.ballPlaced) {
-                    const hitTestResults=frame.getHitTestResults(state.hitTestSource);
-
+                    const hitTestResults = frame.getHitTestResults(state.hitTestSource);
                     if (hitTestResults.length > 0) {
-                        const hit=hitTestResults[0];
-                        const pose=hit.getPose(referenceSpace);
-                        state.reticle.visible=true;
+                        const hit = hitTestResults[0];
+                        const pose = hit.getPose(referenceSpace);
+                        state.reticle.visible = true;
                         state.reticle.matrix.fromArray(pose.transform.matrix);
-                    }
-
-                    else {
-                        state.reticle.visible=false;
+                    } else {
+                        state.reticle.visible = false;
                     }
                 }
 
                 if (state.ballPlaced) {
-                    const dt=0.016;
-                    state.ballVelocity.y -=9.8 * dt;
+                    const dt = 0.016;
+                    state.ballVelocity.y -= 9.8 * dt;
 
-                    state.ball.position.x+=state.ballVelocity.x * dt;
-                    state.ball.position.y+=state.ballVelocity.y * dt;
-                    state.ball.position.z+=state.ballVelocity.z * dt;
+                    state.ball.position.x += state.ballVelocity.x * dt;
+                    state.ball.position.y += state.ballVelocity.y * dt;
+                    state.ball.position.z += state.ballVelocity.z * dt;
 
-                    if (state.ball.position.y - 0.11 <=state.groundLevel) {
-                        state.ball.position.y=state.groundLevel+0.11;
-                        state.ballVelocity.y=Math.abs(state.ballVelocity.y) * 0.7;
-                        state.ballVelocity.x *=0.95;
-                        state.ballVelocity.z *=0.95;
+                    if (state.ball.position.y - 0.11 <= state.groundLevel) {
+                        state.ball.position.y = state.groundLevel + 0.11;
+                        state.ballVelocity.y = Math.abs(state.ballVelocity.y) * 0.7;
+                        state.ballVelocity.x *= 0.95;
+                        state.ballVelocity.z *= 0.95;
                     }
 
                     state.ballVelocity.multiplyScalar(0.98);
 
-                    const speed=Math.sqrt(state.ballVelocity.x ** 2 + state.ballVelocity.z ** 2);
-                    state.ball.rotation.x+=speed * dt * 5;
-                    state.ball.rotation.z+=speed * dt * 3;
+                    const speed = Math.sqrt(state.ballVelocity.x ** 2 + state.ballVelocity.z ** 2);
+                    state.ball.rotation.x += speed * dt * 5;
+                    state.ball.rotation.z += speed * dt * 3;
                 }
             }
 
@@ -346,8 +364,7 @@
         }
 
         function exitAR() {
-            const session=state.renderer.xr.getSession();
-
+            const session = state.renderer.xr.getSession();
             if (session) {
                 session.end();
             }
@@ -355,12 +372,14 @@
 
         function onSessionEnd() {
             state.renderer.domElement.remove();
-            state.renderer=null;
-            state.ballPlaced=false;
+            state.renderer = null;
+            state.ballPlaced = false;
             document.getElementById('arOverlay').classList.remove('visible');
             document.getElementById('instructions').classList.remove('visible');
             document.getElementById('overlay').classList.remove('hidden');
-            document.getElementById('lobby').style.display='block';
+            document.getElementById('lobby').style.display = 'block';
         }
+    </script>
+</body>
 
-        </script></body></html>
+</html>
