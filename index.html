@@ -222,7 +222,7 @@
         state.renderer.setPixelRatio(window.devicePixelRatio);
         state.renderer.setSize(window.innerWidth, window.innerHeight);
         state.renderer.xr.enabled = true;
-        // state.renderer.xr.setReferenceSpaceType('local'); // <-- REMOVED OLD LINE
+        // state.renderer.xr.setReferenceSpaceType('local'); // <-- Removed problematic line
         document.body.appendChild(state.renderer.domElement);
 
         // Lighting
@@ -252,12 +252,12 @@
         // Start AR session
         const session = await navigator.xr.requestSession('immersive-ar', {
           requiredFeatures: ['hit-test'],
-          optionalFeatures: ['local-floor'] // Keep 'local-floor' as optional
+          optionalFeatures: ['local-floor']
         });
 
         await state.renderer.xr.setSession(session);
 
-        // --- NEW ROBUST REFERENCE SPACE SELECTION ---
+        // --- ROBUST REFERENCE SPACE SELECTION (FIX) ---
         let xrReferenceSpace;
         try {
             // 1. Try to get the most stable, tracked space: 'local-floor'
@@ -274,7 +274,8 @@
         }
         // Set the successfully requested reference space on the renderer
         state.renderer.xr.setReferenceSpace(xrReferenceSpace);
-        // ----------------------------------------------------
+        // ----------------------------------------------
+
 
         session.addEventListener('end', onSessionEnd);
 
@@ -284,7 +285,7 @@
         document.getElementById('arRoom').textContent = state.roomCode;
         document.getElementById('arPlayers').textContent = 'Players: ' + state.players.join(', ');
 
-        // Setup hit testing - still needs the 'viewer' space as the starting point
+        // Setup hit testing
         const viewerSpace = await session.requestReferenceSpace('viewer');
         state.hitTestSource = await session.requestHitTestSource({ space: viewerSpace });
 
@@ -304,7 +305,7 @@
 
     function onSelect() {
       if (!state.ballPlaced && state.reticle.visible) {
-        // Place ball
+        // 1. Place ball
         state.ball.position.setFromMatrixPosition(state.reticle.matrix);
         state.ball.position.y += 0.11;
         state.ball.visible = true;
@@ -312,18 +313,18 @@
         state.groundLevel = state.ball.position.y - 0.11;
         state.reticle.visible = false;
       } else if (state.ballPlaced) {
-        // Kick ball
+        // 2. Kick ball
         const direction = new THREE.Vector3(0, 0, -1);
         direction.applyQuaternion(state.camera.quaternion);
         direction.y = 0.3;
         direction.normalize();
-        state.ballVelocity.copy(direction.multiplyScalar(5));
+        // Increased kick strength from 5 to 15 for a more noticeable kick (FIX)
+        state.ballVelocity.copy(direction.multiplyScalar(15)); 
       }
     }
 
     function render(timestamp, frame) {
       if (frame) {
-        // The referenceSpace is now the one successfully requested (local-floor, local, or viewer)
         const referenceSpace = state.renderer.xr.getReferenceSpace();
 
         // Hit test
@@ -331,7 +332,7 @@
           const hitTestResults = frame.getHitTestResults(state.hitTestSource);
           if (hitTestResults.length > 0) {
             const hit = hitTestResults[0];
-            const pose = hit.getPose(referenceSpace); // This correctly uses the active reference space
+            const pose = hit.getPose(referenceSpace);
             state.reticle.visible = true;
             state.reticle.matrix.fromArray(pose.transform.matrix);
           } else {
@@ -342,7 +343,7 @@
         // Ball physics
         if (state.ballPlaced) {
           const dt = 0.016;
-          state.ballVelocity.y -= 9.8 * dt;
+          state.ballVelocity.y -= 9.8 * dt; // Gravity
           
           state.ball.position.x += state.ballVelocity.x * dt;
           state.ball.position.y += state.ballVelocity.y * dt;
@@ -350,13 +351,14 @@
 
           if (state.ball.position.y - 0.11 <= state.groundLevel) {
             state.ball.position.y = state.groundLevel + 0.11;
-            state.ballVelocity.y = Math.abs(state.ballVelocity.y) * 0.7;
-            state.ballVelocity.x *= 0.95;
-            state.ballVelocity.z *= 0.95;
+            state.ballVelocity.y = Math.abs(state.ballVelocity.y) * 0.7; // Bounce
+            state.ballVelocity.x *= 0.95; // Ground friction
+            state.ballVelocity.z *= 0.95; // Ground friction
           }
 
-          state.ballVelocity.multiplyScalar(0.98);
+          state.ballVelocity.multiplyScalar(0.98); // Air resistance/rolling friction
 
+          // Ball rotation
           const speed = Math.sqrt(state.ballVelocity.x ** 2 + state.ballVelocity.z ** 2);
           state.ball.rotation.x += speed * dt * 5;
           state.ball.rotation.z += speed * dt * 3;
