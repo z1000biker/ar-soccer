@@ -4,7 +4,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>AR Soccer - Leg Tracking</title>
+    <title>AR Soccer</title>
     <style>
         body {
             margin: 0;
@@ -137,19 +137,25 @@
             display: block;
         }
 
-        #kickIndicator {
+        #kickBtn {
             position: fixed;
-            top: 50%;
+            bottom: 120px;
             left: 50%;
-            transform: translate(-50%, -50%);
-            background: rgba(255, 0, 0, 0.8);
+            transform: translateX(-50%);
+            background: #ef4444;
             color: white;
-            padding: 30px;
-            border-radius: 50%;
-            font-size: 48px;
+            padding: 20px 40px;
+            border-radius: 50px;
+            font-size: 24px;
             font-weight: bold;
+            border: none;
+            cursor: pointer;
             display: none;
-            z-index: 200;
+            z-index: 150;
+        }
+
+        #kickBtn.visible {
+            display: block;
         }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
@@ -159,7 +165,6 @@
     <div id="overlay">
         <div id="setup">
             <h1>⚽ AR Soccer</h1>
-            <p style="font-size: 14px;">🦵 Leg Tracking Enabled</p>
             <input type="text" id="playerName" placeholder="Your Name" value="Player">
             <br>
             <button class="btn-host" onclick="hostGame()">📡 Host Game</button>
@@ -189,8 +194,8 @@
         </div>
     </div>
 
-    <div id="instructions">Tap to place ball<br>🦵 Shake device or move quickly to kick!</div>
-    <div id="kickIndicator">KICK!</div>
+    <div id="instructions">Tap to place ball</div>
+    <button id="kickBtn" onclick="kickBall()">⚽ KICK</button>
 
     <script>
         let state = {
@@ -205,53 +210,17 @@
             hitTestSource: null,
             ballPlaced: false,
             ballVelocity: new THREE.Vector3(0, 0, 0),
-            groundLevel: 0,
-            lastAccel: { x: 0, y: 0, z: 0 },
-            kickCooldown: false
+            groundLevel: 0
         };
 
-        // Device motion detection for kick
-        window.addEventListener('devicemotion', function (event) {
-            if (!state.ballPlaced || state.kickCooldown) return;
+        function kickBall() {
+            if (!state.ballPlaced) return;
 
-            const accel = event.accelerationIncludingGravity;
-            if (!accel) return;
-
-            const dx = Math.abs(accel.x - state.lastAccel.x);
-            const dy = Math.abs(accel.y - state.lastAccel.y);
-            const dz = Math.abs(accel.z - state.lastAccel.z);
-
-            const totalAccel = Math.sqrt(dx * dx + dy * dy + dz * dz);
-
-            // Kick detected if sudden movement
-            if (totalAccel > 15) {
-                performKick(totalAccel / 5);
-            }
-
-            state.lastAccel = { x: accel.x, y: accel.y, z: accel.z };
-        });
-
-        function performKick(power) {
-            state.kickCooldown = true;
-
-            // Show kick indicator
-            const indicator = document.getElementById('kickIndicator');
-            indicator.style.display = 'block';
-            setTimeout(() => {
-                indicator.style.display = 'none';
-            }, 300);
-
-            // Apply kick force
             const direction = new THREE.Vector3(0, 0, -1);
             direction.applyQuaternion(state.camera.quaternion);
             direction.y = 0.4;
             direction.normalize();
-            state.ballVelocity.copy(direction.multiplyScalar(Math.min(power, 20)));
-
-            // Reset cooldown
-            setTimeout(() => {
-                state.kickCooldown = false;
-            }, 1000);
+            state.ballVelocity.copy(direction.multiplyScalar(20));
         }
 
         function hostGame() {
@@ -337,8 +306,7 @@
                     referenceSpace = await session.requestReferenceSpace('local-floor');
                 } catch (e) {
                     try {
-                        referenceSpace = await session.requestReferenceSpace('local')
-                            ;
+                        referenceSpace = await session.requestReferenceSpace('local');
                     } catch (e) {
                         referenceSpace = await session.requestReferenceSpace('viewer');
                     }
@@ -377,6 +345,8 @@
                 state.ballPlaced = true;
                 state.groundLevel = state.ball.position.y - 0.11;
                 state.reticle.visible = false;
+                document.getElementById('instructions').textContent = 'Press KICK button to shoot!';
+                document.getElementById('kickBtn').classList.add('visible');
             }
         }
 
@@ -435,6 +405,7 @@
             state.ballPlaced = false;
             document.getElementById('arOverlay').classList.remove('visible');
             document.getElementById('instructions').classList.remove('visible');
+            document.getElementById('kickBtn').classList.remove('visible');
             document.getElementById('overlay').classList.remove('hidden');
             document.getElementById('lobby').style.display = 'block';
         }
