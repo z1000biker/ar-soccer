@@ -222,6 +222,7 @@
         state.renderer.setPixelRatio(window.devicePixelRatio);
         state.renderer.setSize(window.innerWidth, window.innerHeight);
         state.renderer.xr.enabled = true;
+        state.renderer.xr.setReferenceSpaceType('local');
         document.body.appendChild(state.renderer.domElement);
 
         // Lighting
@@ -249,11 +250,12 @@
         state.scene.add(state.reticle);
 
         // Start AR session
-        const session = await state.renderer.xr.setSession(
-          await navigator.xr.requestSession('immersive-ar', {
-            requiredFeatures: ['hit-test']
-          })
-        );
+        const session = await navigator.xr.requestSession('immersive-ar', {
+          requiredFeatures: ['hit-test'],
+          optionalFeatures: ['local-floor']
+        });
+
+        await state.renderer.xr.setSession(session);
 
         session.addEventListener('end', onSessionEnd);
 
