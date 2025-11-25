@@ -4,7 +4,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>AR Soccer</title>
+    <title>AR Soccer - Leg Tracking</title>
     <style>
         body {
             margin: 0;
@@ -130,10 +130,26 @@
             border-radius: 20px;
             z-index: 100;
             display: none;
+            text-align: center;
         }
 
         #instructions.visible {
             display: block;
+        }
+
+        #kickIndicator {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(255, 0, 0, 0.8);
+            color: white;
+            padding: 30px;
+            border-radius: 50%;
+            font-size: 48px;
+            font-weight: bold;
+            display: none;
+            z-index: 200;
         }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
@@ -143,6 +159,7 @@
     <div id="overlay">
         <div id="setup">
             <h1>⚽ AR Soccer</h1>
+            <p style="font-size: 14px;">🦵 Leg Tracking Enabled</p>
             <input type="text" id="playerName" placeholder="Your Name" value="Player">
             <br>
             <button class="btn-host" onclick="hostGame()">📡 Host Game</button>
@@ -172,7 +189,8 @@
         </div>
     </div>
 
-    <div id="instructions">Tap to place ball • Tap again to kick</div>
+    <div id="instructions">Tap to place ball<br>🦵 Shake device or move quickly to kick!</div>
+    <div id="kickIndicator">KICK!</div>
 
     <script>
         let state = {
@@ -187,8 +205,54 @@
             hitTestSource: null,
             ballPlaced: false,
             ballVelocity: new THREE.Vector3(0, 0, 0),
-            groundLevel: 0
+            groundLevel: 0,
+            lastAccel: { x: 0, y: 0, z: 0 },
+            kickCooldown: false
         };
+
+        // Device motion detection for kick
+        window.addEventListener('devicemotion', function (event) {
+            if (!state.ballPlaced || state.kickCooldown) return;
+
+            const accel = event.accelerationIncludingGravity;
+            if (!accel) return;
+
+            const dx = Math.abs(accel.x - state.lastAccel.x);
+            const dy = Math.abs(accel.y - state.lastAccel.y);
+            const dz = Math.abs(accel.z - state.lastAccel.z);
+
+            const totalAccel = Math.sqrt(dx * dx + dy * dy + dz * dz);
+
+            // Kick detected if sudden movement
+            if (totalAccel > 15) {
+                performKick(totalAccel / 5);
+            }
+
+            state.lastAccel = { x: accel.x, y: accel.y, z: accel.z };
+        });
+
+        function performKick(power) {
+            state.kickCooldown = true;
+
+            // Show kick indicator
+            const indicator = document.getElementById('kickIndicator');
+            indicator.style.display = 'block';
+            setTimeout(() => {
+                indicator.style.display = 'none';
+            }, 300);
+
+            // Apply kick force
+            const direction = new THREE.Vector3(0, 0, -1);
+            direction.applyQuaternion(state.camera.quaternion);
+            direction.y = 0.4;
+            direction.normalize();
+            state.ballVelocity.copy(direction.multiplyScalar(Math.min(power, 20)));
+
+            // Reset cooldown
+            setTimeout(() => {
+                state.kickCooldown = false;
+            }, 1000);
+        }
 
         function hostGame() {
             state.playerName = document.getElementById('playerName').value || 'Player';
@@ -273,7 +337,8 @@
                     referenceSpace = await session.requestReferenceSpace('local-floor');
                 } catch (e) {
                     try {
-                        referenceSpace = await session.requestReferenceSpace('local');
+                        referenceSpace = await session.requestReferenceSpace('local')
+                            ;
                     } catch (e) {
                         referenceSpace = await session.requestReferenceSpace('viewer');
                     }
@@ -312,12 +377,6 @@
                 state.ballPlaced = true;
                 state.groundLevel = state.ball.position.y - 0.11;
                 state.reticle.visible = false;
-            } else if (state.ballPlaced) {
-                const direction = new THREE.Vector3(0, 0, -1);
-                direction.applyQuaternion(state.camera.quaternion);
-                direction.y = 0.3;
-                direction.normalize();
-                state.ballVelocity.copy(direction.multiplyScalar(15));
             }
         }
 
