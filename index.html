@@ -141,7 +141,7 @@
       <br>
       <button class="btn-back" onclick="backToSetup()">Back</button>
     </div>
-  </div>
+    </div>
 
   <div id="arOverlay">
     <div class="ar-info">
@@ -222,7 +222,7 @@
         state.renderer.setPixelRatio(window.devicePixelRatio);
         state.renderer.setSize(window.innerWidth, window.innerHeight);
         state.renderer.xr.enabled = true;
-        // state.renderer.xr.setReferenceSpaceType('local'); // <-- Removed problematic line
+        // Fix: Removed the problematic reference space setup. Three.js manages this after setSession.
         document.body.appendChild(state.renderer.domElement);
 
         // Lighting
@@ -252,30 +252,19 @@
         // Start AR session
         const session = await navigator.xr.requestSession('immersive-ar', {
           requiredFeatures: ['hit-test'],
-          optionalFeatures: ['local-floor']
+          optionalFeatures: ['local-floor'] // Keep 'local-floor' as optional
         });
 
-        await state.renderer.xr.setSession(session);
+        // Request the reference space Three.js expects to use for the session (local-floor is best)
+        let referenceSpace = await session.requestReferenceSpace('local-floor').catch(() => {
+            // Fallback to 'local' if 'local-floor' fails
+            return session.requestReferenceSpace('local').catch(() => {
+                // Final fallback to 'viewer'
+                return session.requestReferenceSpace('viewer');
+            });
+        });
 
-        // --- ROBUST REFERENCE SPACE SELECTION (FIX) ---
-        let xrReferenceSpace;
-        try {
-            // 1. Try to get the most stable, tracked space: 'local-floor'
-            xrReferenceSpace = await session.requestReferenceSpace('local-floor');
-        } catch (e) {
-            try {
-                // 2. Fallback to a tracked space: 'local'
-                xrReferenceSpace = await session.requestReferenceSpace('local');
-            } catch (e) {
-                // 3. Final fallback to the basic 'viewer' space
-                xrReferenceSpace = await session.requestReferenceSpace('viewer');
-                console.warn("Using 'viewer' reference space as 'local-floor' and 'local' failed.");
-            }
-        }
-        // Set the successfully requested reference space on the renderer
-        state.renderer.xr.setReferenceSpace(xrReferenceSpace);
-        // ----------------------------------------------
-
+        await state.renderer.xr.setSession(session, referenceSpace); // Set session and the requested reference space
 
         session.addEventListener('end', onSessionEnd);
 
@@ -285,7 +274,7 @@
         document.getElementById('arRoom').textContent = state.roomCode;
         document.getElementById('arPlayers').textContent = 'Players: ' + state.players.join(', ');
 
-        // Setup hit testing
+        // Setup hit testing - must be relative to the viewer's current position
         const viewerSpace = await session.requestReferenceSpace('viewer');
         state.hitTestSource = await session.requestHitTestSource({ space: viewerSpace });
 
@@ -318,7 +307,7 @@
         direction.applyQuaternion(state.camera.quaternion);
         direction.y = 0.3;
         direction.normalize();
-        // Increased kick strength from 5 to 15 for a more noticeable kick (FIX)
+        // Increased kick strength to 15
         state.ballVelocity.copy(direction.multiplyScalar(15)); 
       }
     }
