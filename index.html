@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>AR Soccer</title>
   <style>
+    /* --- RESTORED CSS START --- */
     body {
       margin: 0;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
@@ -117,6 +118,7 @@
     #instructions.visible {
       display: block;
     }
+    /* --- RESTORED CSS END --- */
   </style>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 </head>
@@ -150,7 +152,7 @@
         <div id="arPlayers"></div>
       </div>
       <button class="btn-exit" onclick="exitAR()">Exit</button>
-      </div>
+    </div>
   </div>
 
   <div id="instructions">Tap to place ball • Tap again to kick</div>
@@ -254,7 +256,7 @@
           optionalFeatures: ['local-floor']
         });
 
-        // FIX: Robust reference space request that returns a promise
+        // Request the most stable reference space first ('local-floor') and fall back if unsupported.
         let referenceSpace;
         try {
             referenceSpace = await session.requestReferenceSpace('local-floor');
@@ -266,7 +268,7 @@
             }
         }
         
-        // Pass the successfully acquired referenceSpace to Three.js's setSession (FIXED)
+        // Pass the successfully acquired referenceSpace to Three.js's setSession
         await state.renderer.xr.setSession(session, referenceSpace);
 
         session.addEventListener('end', onSessionEnd);
@@ -277,11 +279,11 @@
         document.getElementById('arRoom').textContent = state.roomCode;
         document.getElementById('arPlayers').textContent = 'Players: ' + state.players.join(', ');
 
-        // Setup hit testing
+        // Setup hit testing using the viewer space
         const viewerSpace = await session.requestReferenceSpace('viewer');
         state.hitTestSource = await session.requestHitTestSource({ space: viewerSpace });
 
-        // Controller
+        // Controller (select event is the tap/click)
         const controller = state.renderer.xr.getController(0);
         controller.addEventListener('select', onSelect);
         state.scene.add(controller);
@@ -297,7 +299,7 @@
 
     function onSelect() {
       if (!state.ballPlaced && state.reticle.visible) {
-        // 1. Place ball
+        // 1. Place ball (first tap)
         state.ball.position.setFromMatrixPosition(state.reticle.matrix);
         state.ball.position.y += 0.11;
         state.ball.visible = true;
@@ -305,18 +307,19 @@
         state.groundLevel = state.ball.position.y - 0.11;
         state.reticle.visible = false;
       } else if (state.ballPlaced) {
-        // 2. Kick ball
+        // 2. Kick ball (second tap)
         const direction = new THREE.Vector3(0, 0, -1);
         direction.applyQuaternion(state.camera.quaternion);
-        direction.y = 0.3;
+        direction.y = 0.3; // Give the ball a slight lift
         direction.normalize();
-        // Kick strength increased to 15
+        // Kick strength increased to 15 (powerful kick)
         state.ballVelocity.copy(direction.multiplyScalar(15)); 
       }
     }
 
     function render(timestamp, frame) {
       if (frame) {
+        // This referenceSpace is now reliably set by setSession above
         const referenceSpace = state.renderer.xr.getReferenceSpace();
 
         // Hit test
@@ -334,13 +337,15 @@
 
         // Ball physics
         if (state.ballPlaced) {
-          const dt = 0.016;
-          state.ballVelocity.y -= 9.8 * dt; // Gravity
+          const dt = 0.016; // Time step
+          state.ballVelocity.y -= 9.8 * dt; // Apply Gravity
           
+          // Update position
           state.ball.position.x += state.ballVelocity.x * dt;
           state.ball.position.y += state.ballVelocity.y * dt;
           state.ball.position.z += state.ballVelocity.z * dt;
 
+          // Collision with ground
           if (state.ball.position.y - 0.11 <= state.groundLevel) {
             state.ball.position.y = state.groundLevel + 0.11;
             state.ballVelocity.y = Math.abs(state.ballVelocity.y) * 0.7; // Bounce
@@ -350,7 +355,7 @@
 
           state.ballVelocity.multiplyScalar(0.98); // Air resistance/rolling friction
 
-          // Ball rotation
+          // Ball rotation visualization
           const speed = Math.sqrt(state.ballVelocity.x ** 2 + state.ballVelocity.z ** 2);
           state.ball.rotation.x += speed * dt * 5;
           state.ball.rotation.z += speed * dt * 3;
