@@ -141,7 +141,7 @@
       <br>
       <button class="btn-back" onclick="backToSetup()">Back</button>
     </div>
-    </div>
+  </div>
 
   <div id="arOverlay">
     <div class="ar-info">
@@ -150,7 +150,7 @@
         <div id="arPlayers"></div>
       </div>
       <button class="btn-exit" onclick="exitAR()">Exit</button>
-    </div>
+      </div>
   </div>
 
   <div id="instructions">Tap to place ball • Tap again to kick</div>
@@ -222,7 +222,6 @@
         state.renderer.setPixelRatio(window.devicePixelRatio);
         state.renderer.setSize(window.innerWidth, window.innerHeight);
         state.renderer.xr.enabled = true;
-        // Fix: Removed the problematic reference space setup. Three.js manages this after setSession.
         document.body.appendChild(state.renderer.domElement);
 
         // Lighting
@@ -252,19 +251,23 @@
         // Start AR session
         const session = await navigator.xr.requestSession('immersive-ar', {
           requiredFeatures: ['hit-test'],
-          optionalFeatures: ['local-floor'] // Keep 'local-floor' as optional
+          optionalFeatures: ['local-floor']
         });
 
-        // Request the reference space Three.js expects to use for the session (local-floor is best)
-        let referenceSpace = await session.requestReferenceSpace('local-floor').catch(() => {
-            // Fallback to 'local' if 'local-floor' fails
-            return session.requestReferenceSpace('local').catch(() => {
-                // Final fallback to 'viewer'
-                return session.requestReferenceSpace('viewer');
-            });
-        });
-
-        await state.renderer.xr.setSession(session, referenceSpace); // Set session and the requested reference space
+        // FIX: Robust reference space request that returns a promise
+        let referenceSpace;
+        try {
+            referenceSpace = await session.requestReferenceSpace('local-floor');
+        } catch (e) {
+            try {
+                referenceSpace = await session.requestReferenceSpace('local');
+            } catch (e) {
+                referenceSpace = await session.requestReferenceSpace('viewer');
+            }
+        }
+        
+        // Pass the successfully acquired referenceSpace to Three.js's setSession (FIXED)
+        await state.renderer.xr.setSession(session, referenceSpace);
 
         session.addEventListener('end', onSessionEnd);
 
@@ -274,7 +277,7 @@
         document.getElementById('arRoom').textContent = state.roomCode;
         document.getElementById('arPlayers').textContent = 'Players: ' + state.players.join(', ');
 
-        // Setup hit testing - must be relative to the viewer's current position
+        // Setup hit testing
         const viewerSpace = await session.requestReferenceSpace('viewer');
         state.hitTestSource = await session.requestHitTestSource({ space: viewerSpace });
 
@@ -307,7 +310,7 @@
         direction.applyQuaternion(state.camera.quaternion);
         direction.y = 0.3;
         direction.normalize();
-        // Increased kick strength to 15
+        // Kick strength increased to 15
         state.ballVelocity.copy(direction.multiplyScalar(15)); 
       }
     }
